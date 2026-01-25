@@ -135,7 +135,8 @@ print("✅ Verification utilities loaded")
 
 transaction_count_df = spark.sql("""
 
-
+SELECT count(*) as transaction_count
+FROM samples.bakehouse.sales_transactions
 
 """)
 
@@ -164,8 +165,10 @@ print("✅ Task 1.2 complete: Transaction count verified")
 # Expected result: Multiple rows with payment method names
 
 payment_methods_df = spark.sql("""
-
-
+                               
+SELECT DISTINCT paymentMethod
+FROM samples.bakehouse.sales_transactions
+ORDER BY paymentMethod
 
 """)
 
@@ -195,7 +198,9 @@ print("✅ Task 1.3 complete: Payment methods identified")
 # Expected result: One row with average value around $15-25
 
 avg_value_df = spark.sql("""
-
+                         
+SELECT ROUND(AVG(totalPrice), 2) as avg_transaction_value
+FROM samples.bakehouse.sales_transactions
 
 """)
 
@@ -228,14 +233,15 @@ print(f"✅ Task 1.4 complete: Average transaction value = ${avg_value:.2f}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Untitled
 # TODO: Create DataFrames from Bakehouse tables
 # Use spark.table() to load:
 # - samples.bakehouse.sales_transactions → transactions_df
 # - samples.bakehouse.sales_customers → customers_df
 
-transactions_df =
+transactions_df = spark.table("samples.bakehouse.sales_transactions")
 
-customers_df =
+customers_df = spark.table("samples.bakehouse.sales_customers")
 
 # COMMAND ----------
 
