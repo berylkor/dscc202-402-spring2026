@@ -281,8 +281,8 @@ print("✅ Task 2.1 complete: DataFrames created")
 from pyspark.sql.functions import desc
 
 high_value_df = (transactions_df
-    .filter(  )  # Your filter condition here
-    .orderBy(  )  # Your sort expression here
+    .filter(col("totalPrice") > 50)  # Your filter condition here
+    .orderBy( desc("totalPrice") )  # Your sort expression here
 )
 
 display(high_value_df)
@@ -312,7 +312,8 @@ print(f"✅ Task 2.3 complete: Found {high_value_df.count()} high-value transact
 # Pass column names as strings to the select() method
 
 customer_summary_df = customers_df.select(
-
+ 
+ "customerID", "first_name", "last_name", "city"
 
 )
 
@@ -350,6 +351,7 @@ print("✅ Task 2.4 complete: Column selection verified")
 # Call the printSchema() method to display the schema
 
 inferred_schema_df = spark.table("samples.bakehouse.sales_transactions")
+inferred_schema_df.printSchema()
 
 
 # COMMAND ----------
@@ -374,7 +376,10 @@ from pyspark.sql.types import StructType, StructField, LongType, StringType, Dou
 
 franchise_schema = StructType([
 
-
+    StructField("franchiseID", LongType(), nullable = True),
+    StructField("name", StringType(), nullable = True),
+    StructField ("city", StringType(), nullable = True),
+    StructField ("country", StringType(), nullable = True)
 
 ])
 
@@ -391,12 +396,12 @@ franchise_schema = StructType([
 # 1. Filter where paymentMethod column equals "visa"
 # 2. Specify format as "delta" for Delta Lake format
 
-visa_transactions_df = transactions_df.filter(  )
+visa_transactions_df = transactions_df.filter(col("paymentMethod") == "visa")
 
 (visa_transactions_df
     .write
     .mode("overwrite")
-    .format(  )  # Specify Delta format
+    .format("delta")  # Specify Delta format
     .save(f"{working_dir}/visa_transactions")
 )
 
@@ -422,7 +427,7 @@ print("✅ Task 3.3 complete: Data written to Delta format")
 
 read_visa_df = (spark
     .read
-    .format(  )  # Specify Delta format
+    .format( "delta" )  # Specify Delta format
     .load(f"{working_dir}/visa_transactions")
 )
 
@@ -462,6 +467,7 @@ from pyspark.sql.functions import col
 transactions_with_discount_df = transactions_df.withColumn(
     "discount_per_unit",
       # Your calculation here: col("unitPrice") - (col("totalPrice") / col("quantity"))
+      col("unitPrice") -(col("totalPrice") / col("quantity"))
 )
 
 display(transactions_with_discount_df)
@@ -487,6 +493,7 @@ print("✅ Task 4.1 complete: Discount calculation added")
 
 credit_card_df = transactions_with_discount_df.filter(
       # Your filter condition here
+      col("paymentMethod").like("%amex%")
 )
 
 display(credit_card_df)
@@ -514,9 +521,9 @@ print(f"✅ Task 4.2 complete: {credit_card_df.count()} credit card transactions
 # Step 3: Sort by revenue descending (use orderBy with desc)
 
 chained_df = (transactions_df
-    .withColumn("revenue",  )  # Calculate: col("quantity") * col("unitPrice")
-    .filter(  )  # Filter condition: col("revenue") > 30
-    .orderBy(  )  # Sort expression: desc("revenue")
+    .withColumn("revenue", col("quantity") * col("unitPrice"))  # Calculate: col("quantity") * col("unitPrice")
+    .filter( col("revenue") > 30 )  # Filter condition: col("revenue") > 30
+    .orderBy( desc("revenue") )  # Sort expression: desc("revenue")
 )
 
 display(chained_df)
@@ -557,9 +564,9 @@ print("✅ Task 4.3 complete: Method chaining successful")
 from pyspark.sql.functions import sum, avg, round as spark_round
 
 revenue_by_franchise_df = (transactions_df
-    .groupBy(  )  # Which column to group by?
-    .agg(sum(  ).alias("total_revenue"))  # Sum which column?
-    .orderBy(  )  # Sort by which column, descending?
+    .groupBy(col("franchiseID") )  # Which column to group by?
+    .agg(sum("totalPrice").alias("total_revenue"))  # Sum which column?
+    .orderBy( desc("total_revenue") )  # Sort by which column, descending?
 )
 
 display(revenue_by_franchise_df)
@@ -588,9 +595,9 @@ print("✅ Task 5.1 complete: Franchise revenue calculated")
 # 3. Order by "avg_transaction_value" descending
 
 avg_transaction_by_franchise_df = (transactions_df
-    .groupBy(  )  # Group by franchiseID
-    .agg(spark_round(avg(  ), 2).alias("avg_transaction_value"))  # Avg which column?
-    .orderBy(  )  # Sort by avg_transaction_value descending
+    .groupBy( "franchiseID" )  # Group by franchiseID
+    .agg(spark_round(avg( "totalPrice" ), 2).alias("avg_transaction_value"))  # Avg which column?
+    .orderBy( desc("avg_transaction_value") )  # Sort by avg_transaction_value descending
 )
 
 display(avg_transaction_by_franchise_df)
@@ -615,7 +622,7 @@ print("✅ Task 5.2 complete: Average transaction value calculated")
 # TODO: Get top 3 franchises
 # Use .limit(3) method on revenue_by_franchise_df
 
-top_3_franchises_df = revenue_by_franchise_df.
+top_3_franchises_df = revenue_by_franchise_df.limit(3)
 
 display(top_3_franchises_df)
 
@@ -651,10 +658,10 @@ print("✅ Task 5.3 complete: Top 3 franchises identified")
 from pyspark.sql.functions import year, month, dayofmonth, hour, date_format
 
 transactions_with_dates_df = (transactions_df
-    .withColumn("year", year(col(  )))  # Extract year from which column?
-    .withColumn("month",  )  # Use month() function
-    .withColumn("day",  )  # Use dayofmonth() function
-    .withColumn("hour",  )  # Use hour() function
+    .withColumn("year", year(col( "dateTime" )))  # Extract year from which column?
+    .withColumn("month", month(col("dateTime")) )  # Use month() function
+    .withColumn("day", dayofmonth(col("dateTime")) )  # Use dayofmonth() function
+    .withColumn("hour", hour(col("dateTime")) )  # Use hour() function
 )
 
 display(transactions_with_dates_df)
@@ -686,10 +693,10 @@ print("✅ Task 6.1 complete: Date components extracted")
 from pyspark.sql.functions import approx_count_distinct, to_date
 
 daily_customers_df = (transactions_df
-    .withColumn("transaction_date", to_date(col(  )))  # Which datetime column?
-    .groupBy(  )  # Group by which column?
-    .agg(approx_count_distinct(  ).alias("active_customers"))  # Count distinct which column?
-    .orderBy(  )  # Sort by which column?
+    .withColumn("transaction_date", to_date(col( "dateTime" )))  # Which datetime column?
+    .groupBy( "transaction_date" )  # Group by which column?
+    .agg(approx_count_distinct( "customerID" ).alias("active_customers"))  # Count distinct which column?
+    .orderBy( "transaction_date" )  # Sort by which column?
 )
 
 display(daily_customers_df)
@@ -720,10 +727,10 @@ print("✅ Task 6.2 complete: Daily active customers calculated")
 from pyspark.sql.functions import dayofweek
 
 revenue_by_dow_df = (transactions_df
-    .withColumn("day_of_week", date_format(col(  ),  ))  # Format pattern: "E" for day name
-    .groupBy(  )  # Group by which column?
-    .agg(sum(  ).alias("total_revenue"))  # Sum which column?
-    .orderBy(  )  # Sort by revenue descending
+    .withColumn("day_of_week", date_format(col( "dateTime" ), "E" ))  # Format pattern: "E" for day name
+    .groupBy( "day_of_week" )  # Group by which column?
+    .agg(sum( "totalPrice" ).alias("total_revenue"))  # Sum which column?
+    .orderBy( desc("total_revenue") )  # Sort by revenue descending
 )
 
 display(revenue_by_dow_df)
@@ -764,7 +771,7 @@ reviews_df = spark.table("samples.bakehouse.media_customer_reviews")
 
 reviews_with_words_df = reviews_df.withColumn(
     "review_words",
-    split(col(  ), " ")  # Which column to split?
+    split(col( "review" ), " ")  # Which column to split?
 )
 
 display(reviews_with_words_df)
@@ -793,8 +800,8 @@ print("✅ Task 7.1 complete: Review text split into word arrays")
 from pyspark.sql.functions import collect_set
 
 customer_products_df = (transactions_df
-    .groupBy(  )  # Group by which column?
-    .agg(collect_set(  ).alias("products_purchased"))  # Collect which column?
+    .groupBy( "customerID" )  # Group by which column?
+    .agg(collect_set( "product" ).alias("products_purchased"))  # Collect which column?
 )
 
 display(customer_products_df)
@@ -823,7 +830,7 @@ from pyspark.sql.functions import size
 
 customer_product_count_df = customer_products_df.withColumn(
     "product_count",
-    size(col(  ))  # Get size of which array column?
+    size(col( "products_purchased" ))  # Get size of which array column?
 )
 
 display(customer_product_count_df)
@@ -853,7 +860,7 @@ from pyspark.sql.functions import explode
 exploded_words_df = reviews_with_words_df.select(
     "franchiseID",
     "review_date",
-    explode(col(  )).alias("word")  # Explode which array column?
+    explode(col( "review_words" )).alias("word")  # Explode which array column?
 )
 
 display(exploded_words_df.limit(50))
