@@ -937,6 +937,7 @@ full_transaction_df = (transactions_with_customers_df
     .join(
         franchises_df,
           # Join condition on franchiseID
+        transactions_with_customers_df["franchiseID"] == franchises_df["franchiseID"],
         "inner"
     )
     .select(
@@ -974,6 +975,7 @@ customers_without_reviews_df = (customers_df
         reviews_df,
         customers_df["customerID"] == reviews_df["franchiseID"],  # Note: This is a simplified join
           # Join type: use "left" to keep all customers
+        "left"
     )
     .filter(col("review_date").isNull())
     .select(customers_df["*"])
@@ -1004,7 +1006,7 @@ print(f"✅ Task 8.3 complete: Found {customers_without_reviews_df.count()} cust
 from pyspark.sql.functions import coalesce, lit
 
 franchises_cleaned_df = franchises_df.na.fill(
-    {"size":  }  # What value to fill nulls with?
+    {"size": "Unknown" }  # What value to fill nulls with?
 )
 
 display(franchises_cleaned_df)
@@ -1046,9 +1048,9 @@ from pyspark.sql.types import StringType
 def categorize_payment(payment_method):
     """Categorize payment methods into Credit Card or Other."""
     if payment_method.lower() in ["visa", "mastercard", "amex"]:
-        return   # What should credit cards return?
+        return "Credit Card"  # What should credit cards return?
     else:
-        return   # What should other methods return?
+        return "Other"  # What should other methods return?
 
 # Register as UDF
 categorize_payment_udf = udf(categorize_payment, StringType())
@@ -1089,17 +1091,17 @@ print("✅ Task 9.1 complete: Payment methods categorized")
 def classify_transaction_size(total_price):
     """Classify transactions by size."""
     if total_price < 20:
-        return   # Return "Small"
+        return  "Small" # Return "Small"
     elif total_price <= 50:
-        return   # Return "Medium"
+        return  "Medium" # Return "Medium"
     else:
-        return   # Return "Large"
+        return "Large"  # Return "Large"
 
-classify_size_udf = udf(  , StringType())  # Pass the function name
+classify_size_udf = udf(classify_transaction_size , StringType())  # Pass the function name
 
 transactions_with_size_df = transactions_df.withColumn(
     "transaction_size",
-    classify_size_udf(col(  ))  # Which column to classify?
+    classify_size_udf(col( "totalPrice" ))  # Which column to classify?
 )
 
 display(transactions_with_size_df)
@@ -1139,7 +1141,7 @@ def day_name_to_number(day_name):
     }
     return day_map.get(day_name, 0)
 
-day_to_num_udf = udf(  ,  )  # Pass function name and IntegerType()
+day_to_num_udf = udf( day_name_to_number , IntegerType() )  # Pass function name and IntegerType()
 
 # Apply to revenue by day of week
 revenue_sorted_df = (transactions_df
@@ -1185,16 +1187,21 @@ print("✅ Task 9.3 complete: Custom day sorting applied")
 # 4. Sort by total revenue descending and limit to top 5
 #
 # This challenge has no pre-written structure - design your solution!
+from pyspark.sql.functions import count
 
 franchise_metrics_df = (transactions_df
     # Your implementation here - combine multiple transformations
-
-
-
+    .withColumn("payment_category",categorize_payment_udf(col("paymentMethod")))
+    .withColumn("day_name", date_format(col("dateTime"), "EEEE"))
+    .groupBy("franchiseID")
+    .agg(sum("totalPrice").alias("total_revenue"), count("*").alias("transaction_count"), avg("totalPrice").alias("avg_revenue"))
+    .orderBy(desc("total_revenue"))
+    .limit(5)
 
 )
 
 display(franchise_metrics_df)
+
 
 # COMMAND ----------
 
