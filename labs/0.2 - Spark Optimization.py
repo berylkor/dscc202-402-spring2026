@@ -269,7 +269,7 @@ print(f"📊 Efficiency gain: Reduced franchise table from {franchises_df.count(
 # TODO: Repartition to 8 partitions
 # Use .repartition(8) method on transactions_df
 
-repartitioned_df = transactions_df.
+repartitioned_df = transactions_df.repartition(8)
 
 # Write to verify partition count through file output
 (repartitioned_df
@@ -309,7 +309,7 @@ print("📝 Note: repartition() triggers a full shuffle but ensures even distrib
 # Load the repartitioned data from Task 2.1
 base_df = spark.read.format("delta").load(f"{working_dir}/repartitioned_demo")
 
-coalesced_df = base_df.
+coalesced_df = base_df.coalesce(2)
 
 # Write and verify
 (coalesced_df
@@ -409,12 +409,16 @@ duplicates_df = (base_customers_df
     # Use when(col("duplicate_id") % 2 == 0, ...) to uppercase some last names
     .withColumn("last_name",
           # when(condition, upper(col("last_name"))).otherwise(col("last_name"))
+          when(col("duplicate_id") % 2 == 0, upper(col("last_name")))
+          .otherwise(col("last_name"))
     )
 
     # TODO: Add variations to email (some uppercase domain)
     # Use when(col("duplicate_id") % 4 == 0, ...) to uppercase some emails
     .withColumn("email_address",
           # when(condition, upper(col("email_address"))).otherwise(col("email_address"))
+          when(col("duplicate_id") % 4 == 0, upper(col("email_address")))
+          .otherwise(col("email_address"))
     )
 
     # Drop the temporary column
@@ -455,7 +459,7 @@ dups_df = spark.read.format("delta").load(f"{working_dir}/customers_with_duplica
 # Use dropDuplicates() on key columns: customerID, first_name, last_name, email_address
 # Pass columns as a list
 
-simple_dedup_df = dups_df.dropDuplicates(  )  # List of column names
+simple_dedup_df = dups_df.dropDuplicates(["customerID", "first_name", "last_name", "email_address"])  # List of column names
 
 print(f"Original: {dups_df.count():,}")
 print(f"After simple dedup: {simple_dedup_df.count():,}")
@@ -487,16 +491,16 @@ print("✅ Task 3.2 complete: Simple deduplication attempted")
 from pyspark.sql.functions import lower
 
 normalized_df = (dups_df
-    .withColumn("lcFirstName", lower(col(  )))  # Lowercase which column?
-    .withColumn("lcLastName",  )  # lower(col("last_name"))
-    .withColumn("lcEmail",  )  # lower(col("email_address"))
+    .withColumn("lcFirstName", lower(col("first_name")))  # Lowercase which column?
+    .withColumn("lcLastName", lower(col("last_name")))  # lower(col("last_name"))
+    .withColumn("lcEmail", lower(col("email_address")))  # lower(col("email_address"))
 )
 
 # Drop duplicates based on normalized columns
-deduped_df = normalized_df.dropDuplicates(  )  # List: ["lcFirstName", "lcLastName", "lcEmail"]
+deduped_df = normalized_df.dropDuplicates(["lcFirstName", "lcLastName", "lcEmail"])  # List: ["lcFirstName", "lcLastName", "lcEmail"]
 
 # Clean up temporary columns
-final_df = deduped_df.drop(  )  # Drop lcFirstName, lcLastName, lcEmail
+final_df = deduped_df.drop("lcFirstName", "lcLastName", "lcEmail")  # Drop lcFirstName, lcLastName, lcEmail
 
 print(f"After case-insensitive dedup: {final_df.count():,}")
 print(f"Additional duplicates removed: {simple_dedup_df.count() - final_df.count():,}")
