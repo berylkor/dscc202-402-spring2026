@@ -572,7 +572,7 @@ print("📝 Standardization catches duplicates with formatting differences")
 # Use .repartition(1) to create a single output file
 
 (final_standardized_df
- .repartition(  )  # How many partitions for single file?
+ .repartition(1)  # How many partitions for single file?
  .write
  .mode("overwrite")
  .format("delta")
@@ -627,16 +627,16 @@ print(f"📊 Summary: {dups_df.count():,} → {deduped_count:,} customers ({((1 
 from pyspark.sql.functions import sum, count, countDistinct, desc
 
 # Step 1: Load deduplicated customers
-clean_customers_df =   # Load from f"{working_dir}/customers_deduplicated"
+clean_customers_df = spark.read.format("delta").load(f"{working_dir}/customers_deduplicated")  # Load from f"{working_dir}/customers_deduplicated"
 
 # Step 2: Load and filter franchises to US only (predicate pushdown!)
-usa_franchises_df =   # Load franchises and filter country == "USA"
+usa_franchises_df = spark.table("samples.bakehouse.sales_franchises").filter(col("country") == "US")  # Load franchises and filter country == "USA"
 
 # Step 3: Join transactions with clean customers, then with USA franchises
 # Use "customerID" for customer join, "franchiseID" for franchise join
 enriched_transactions_df = (transactions_df
-    .join(  ,  )  # Join with clean_customers_df on "customerID"
-    .join(  ,  )  # Join with usa_franchises_df on "franchiseID"
+    .join(clean_customers_df, "customerID")  # Join with clean_customers_df on "customerID"
+    .join(usa_franchises_df, "franchiseID")  # Join with usa_franchises_df on "franchiseID"
 )
 
 # Step 4: Calculate franchise performance metrics
@@ -646,23 +646,30 @@ enriched_transactions_df = (transactions_df
 franchise_report_df = (enriched_transactions_df
     .groupBy(
           # "franchiseID"
+          "franchiseID",
           # usa_franchises_df["name"] - disambiguate franchise name
+          usa_franchises_df["name"],
           # usa_franchises_df["city"] - disambiguate franchise city
+          usa_franchises_df["city"],
           # usa_franchises_df["country"] - disambiguate franchise country
+          usa_franchises_df["country"]
     )
     .agg(
           # sum("totalPrice").alias("total_revenue")
+          sum("totalPrice").alias("total_revenue"),
           # count("transactionID").alias("transaction_count")
+          count("transactionID").alias("transaction_count"),
           # countDistinct("customerID").alias("unique_customers")
+          countDistinct("customerID").alias("unique_customers")
     )
-    .orderBy(  )  # desc("total_revenue")
+    .orderBy(desc("total_revenue"))  # desc("total_revenue")
 )
 
 display(franchise_report_df)
 
 # Step 5: Write optimized output
 (franchise_report_df
- .repartition(  )  # Choose appropriate partition count (e.g., 1-4)
+ .repartition(4)  # Choose appropriate partition count (e.g., 1-4)
  .write
  .mode("overwrite")
  .format("delta")
