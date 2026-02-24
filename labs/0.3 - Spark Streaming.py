@@ -235,18 +235,18 @@ print("✅ Task 1.1 complete: Streaming source data prepared")
 # 2. Write stream: format="delta", outputMode="append", checkpoint, trigger, start path
 
 streaming_df = (spark.readStream
-    .format(  )  # Delta format
-    .load(  )  # Path to streaming_source
+    .format( "delta" )  # Delta format
+    .load( f"{working_dir}/streaming_source" )  # Path to streaming_source
 )
 
 # Write streaming data to test location
 test_query = (streaming_df
     .writeStream
-    .format(  )  # Delta format
-    .outputMode(  )  # "append" for non-aggregated data
-    .option("checkpointLocation",  )  # Checkpoint path: f"{checkpoint_dir}/test_stream"
-    .trigger(  )  # availableNow=True for Free Edition
-    .start(  )  # Output path: f"{working_dir}/test_stream"
+    .format( "delta" )  # Delta format
+    .outputMode( "append" )  # "append" for non-aggregated data
+    .option("checkpointLocation", f"{checkpoint_dir}/test_stream" )  # Checkpoint path: f"{checkpoint_dir}/test_stream"
+    .trigger( availableNow=True )  # availableNow=True for Free Edition
+    .start( f"{working_dir}/test_stream" )  # Output path: f"{working_dir}/test_stream"
 )
 
 # Wait for processing to complete
@@ -285,11 +285,11 @@ print("📝 Note: In Free Edition, we write streams and verify outputs by readin
 
 query = (streaming_df
     .writeStream
-    .format(  )  # Delta format
-    .outputMode(  )  # "append" for non-aggregated data
-    .option("checkpointLocation",  )  # f"{checkpoint_dir}/real_time_sales"
-    .trigger(  )  # availableNow=True for Free Edition
-    .start(  )  # f"{working_dir}/real_time_sales"
+    .format( "delta" )  # Delta format
+    .outputMode( "append" )  # "append" for non-aggregated data
+    .option("checkpointLocation", f"{checkpoint_dir}/real_time_sales" )  # f"{checkpoint_dir}/real_time_sales"
+    .trigger( availableNow=True )  # availableNow=True for Free Edition
+    .start(f"{working_dir}/real_time_sales")  # f"{working_dir}/real_time_sales"
 )
 
 # Wait for all data to be processed
@@ -337,9 +337,9 @@ monitor_query = (spark.readStream
 # TODO: Access query properties
 # Use monitor_query.id, monitor_query.isActive, monitor_query.status
 
-print(f"Query ID: {  }")  # Get query ID
-print(f"Is Active: {  }")  # Check if query is active
-print(f"Status: {  }")  # Get query status
+print(f"Query ID: { monitor_query.id }")  # Get query ID
+print(f"Is Active: { monitor_query.isActive }")  # Check if query is active
+print(f"Status: { monitor_query.status }")  # Get query status
 
 # List all active queries
 print(f"\nAll active queries: {len(spark.streams.active)}")
@@ -394,7 +394,7 @@ from pyspark.sql.functions import window, sum, count, avg
 streaming_df = (spark.readStream
     .format("delta")
     .load(f"{working_dir}/streaming_source")
-    .withWatermark(  ,  )  # Column name and interval
+    .withWatermark( "dateTime" , "10 minutes" )  # Column name and interval
 )
 
 print("✅ Streaming DataFrame with watermark created")
@@ -424,24 +424,24 @@ print("📝 Watermarks balance between waiting for late data and finalizing resu
 
 hourly_sales_df = (streaming_df
     .groupBy(
-        window(col(  ), "  "),  # Column name and window duration
-        col(  )  # Franchise column for grouping
+        window(col( "dateTime" ), "1 hour"),  # Column name and window duration
+        col( "franchiseID" )  # Franchise column for grouping
     )
     .agg(
-        sum(  ).alias("total_sales"),  # Column to sum
-        count(  ).alias("transaction_count"),  # Column to count
-        avg(  ).alias("avg_transaction_value")  # Column to average
+        sum( "totalPrice" ).alias("total_sales"),  # Column to sum
+        count( "quantity" ).alias("transaction_count"),  # Column to count
+        avg( "unitPrice" ).alias("avg_transaction_value")  # Column to average
     )
 )
 
 # Write the aggregated stream to Delta
 hourly_query = (hourly_sales_df
     .writeStream
-    .format(  )  # Delta format
-    .outputMode(  )  # Output mode for windowed aggregations
-    .option("checkpointLocation",  )  # Checkpoint path
-    .trigger(  )  # Trigger type
-    .start(  )  # Output path
+    .format( "delta" )  # Delta format
+    .outputMode( "append" )  # Output mode for windowed aggregations
+    .option("checkpointLocation", f"{checkpoint_dir}/hourly_verification" )  # Checkpoint path
+    .trigger( availableNow=True )  # Trigger type
+    .start( f"{working_dir}/hourly_verification" )  # Output path
 )
 
 # Wait for processing to complete
