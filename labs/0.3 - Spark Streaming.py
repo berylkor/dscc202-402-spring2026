@@ -476,11 +476,11 @@ print("📝 The window column contains the start/end time of each hourly bucket"
 
 query = (hourly_sales_df
     .writeStream
-    .format(  )  # Delta format
-    .outputMode(  )  # Append mode
-    .option("checkpointLocation",  )  # Checkpoint path
-    .trigger(  )  # availableNow=True
-    .start(  )  # Output path for hourly_sales
+    .format( "delta" )  # Delta format
+    .outputMode( "append" )  # Append mode
+    .option("checkpointLocation", f"{checkpoint_dir}/hourly_sales" )  # Checkpoint path
+    .trigger( availableNow=True )  # availableNow=True
+    .start( f"{working_dir}/hourly_sales" )  # Output path for hourly_sales
 )
 
 # Process all available data
@@ -513,8 +513,8 @@ print(f"✅ Task 2.3 complete: Wrote {hourly_results.count()} hourly aggregation
 from pyspark.sql.functions import desc
 
 peak_hours_df = (spark.read
-    .format(  )  # Delta format
-    .load(  )  # Path to hourly_sales output
+    .format( "delta" )  # Delta format
+    .load( f"{working_dir}/hourly_sales" )  # Path to hourly_sales output
     .select(
         col("window.start").alias("hour_start"),
         col("window.end").alias("hour_end"),
@@ -523,7 +523,7 @@ peak_hours_df = (spark.read
         col("transaction_count"),
         col("avg_transaction_value")
     )
-    .orderBy(  )  # Sort by total_sales descending
+    .orderBy( col("total_sales").desc() )  # Sort by total_sales descending
 )
 
 display(peak_hours_df)
@@ -567,16 +567,16 @@ streaming_df = (spark.readStream
     .load(f"{working_dir}/streaming_source")
 )
 
-high_value_stream = streaming_df.filter(col(  ) >  )  # Filter condition
+high_value_stream = streaming_df.filter(col( "totalPrice" ) > 50 )  # Filter condition
 
 # Write filtered stream to Delta
 filter_query = (high_value_stream
     .writeStream
-    .format(  )  # Delta format
-    .outputMode(  )  # Append mode
-    .option("checkpointLocation",  )  # Checkpoint path
-    .trigger(  )  # availableNow=True
-    .start(  )  # Output path
+    .format( "delta" )  # Delta format
+    .outputMode( "append" )  # Append mode
+    .option("checkpointLocation", f"{checkpoint_dir}/high_value_filter" )  # Checkpoint path
+    .trigger( availableNow=True )  # availableNow=True
+    .start( f"{working_dir}/high_value_filter" )  # Output path
 )
 
 # Wait for processing to complete
@@ -608,11 +608,11 @@ print("✅ Task 3.1 complete: Filtered for high-value transactions")
 # Group by traffic source and calculate revenue metrics
 
 traffic_metrics_df = (streaming_df
-    .groupBy(  )  # Column to group by
+    .groupBy( "traffic_source" )  # Column to group by
     .agg(
-        sum(  ).alias("total_revenue"),  # Column to sum
-        count(  ).alias("transaction_count"),  # Column to count
-        avg(  ).alias("avg_order_value")  # Column to average
+        sum( "totalPrice" ).alias("total_revenue"),  # Column to sum
+        count( "quantity" ).alias("transaction_count"),  # Column to count
+        avg( "totalPrice" ).alias("avg_order_value")  # Column to average
     )
 )
 
@@ -629,9 +629,9 @@ streaming_df_with_watermark = (spark.readStream
 traffic_metrics_df = (streaming_df_with_watermark
     .groupBy("traffic_source")
     .agg(
-        sum(  ).alias("total_revenue"),  # Column to sum
-        count(  ).alias("transaction_count"),  # Column to count
-        avg(  ).alias("avg_order_value")  # Column to average
+        sum( "totalPrice" ).alias("total_revenue"),  # Column to sum
+        count( "quantity" ).alias("transaction_count"),  # Column to count
+        avg( "totalPrice" ).alias("avg_order_value")  # Column to average
     )
 )
 
@@ -672,12 +672,12 @@ print("✅ Task 3.2 complete: Traffic source metrics calculated")
 
 franchise_traffic_metrics_df = (streaming_df
     .groupBy(
-          ,  # First grouping column
-            # Second grouping column
+        "traffic_source",  # First grouping column
+        "franchiseID" # Second grouping column
     )
     .agg(
-        sum(  ).alias("total_revenue"),  # Column to sum
-        count(  ).alias("transaction_count")  # Column to count
+        sum( "totalPrice" ).alias("total_revenue"),  # Column to sum
+        count( "quantity" ).alias("transaction_count")  # Column to count
     )
 )
 
@@ -724,12 +724,12 @@ franchises_df = spark.table("samples.bakehouse.sales_franchises")
 
 # Join stream with static data
 enriched_stream = (streaming_df
-    .join(  ,  )  # DataFrame to join and join column
+    .join( "franchises_df" , "franchiseID" )  # DataFrame to join and join column
     .select(
         col("dateTime"),
         col("franchiseID"),
-        franchises_df[  ].alias("franchise_name"),  # Franchise name column
-        franchises_df[  ].alias("franchise_city"),  # Franchise city column
+        franchises_df[ "name" ].alias("franchise_name"),  # Franchise name column
+        franchises_df[ "city" ].alias("franchise_city"),  # Franchise city column
         col("traffic_source"),
         col("product"),
         col("totalPrice")
@@ -797,8 +797,8 @@ from pyspark.sql.functions import current_timestamp, sum, count, approx_count_di
 
 # Create streaming source with watermark
 streaming_df = (spark.readStream
-    .format(  )  # Delta format
-    .load(  )  # Path to streaming source
+    .format( "delta" )  # Delta format
+    .load( f"{working_dir}/streaming_source" )  # Path to streaming source
     .withWatermark(  ,  )  # Column name and watermark interval
 )
 
