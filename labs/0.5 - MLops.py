@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "2"
+# ///
 # MAGIC %md
 # MAGIC # MLflow Experiment Tracking and Distributed ML with Pandas UDFs
 # MAGIC
@@ -198,13 +202,13 @@ def extract_time_features(timestamps: pd.Series) -> pd.DataFrame:
 
     # Extract features
     return pd.DataFrame({
-        "hour":  ,  # Extract hour from dt using dt.dt.hour
-        "day_of_week":  ,  # Extract day of week using dt.dt.dayofweek
-        "is_weekend":  # Cast to int: (dt.dt.dayofweek >= 5).astype(int)
+        "hour": dt.dt.hour,  # Extract hour from dt using dt.dt.hour
+        "day_of_week": dt.dt.dayofweek,  # Extract day of week using dt.dt.dayofweek
+        "is_weekend": (dt.dt.dayofweek >= 5).astype(int) # Cast to int: (dt.dt.dayofweek >= 5).astype(int)
     })
 
 # Apply the UDF to create time features
-trips_with_time = trips_df.withColumn("time_features", extract_time_features(col(  )))  # Which column?
+trips_with_time = trips_df.withColumn("time_features", extract_time_features(col( "tpep_pickup_datetime" )))  # Which column?
 
 # Expand struct into individual columns
 trips_with_time = trips_with_time.select(
@@ -266,24 +270,24 @@ def calculate_trip_metrics(pickup_times: pd.Series, dropoff_times: pd.Series, di
     dropoff = pd.to_datetime(dropoff_times)
 
     # Calculate duration in minutes
-    duration_minutes =  # Hint: (dropoff - pickup).dt.total_seconds() / 60
+    duration_minutes = (dropoff - pickup).dt.total_seconds() / 60 # Hint: (dropoff - pickup).dt.total_seconds() / 60
 
     # Calculate average speed (mph) - handle division by zero
-    duration_hours =  # Convert minutes to hours
-    avg_speed =  # Use np.where(duration_hours > 0, distances / duration_hours, 0)
+    duration_hours = duration_minutes / 60 # Convert minutes to hours
+    avg_speed = np.where(duration_hours > 0, distances / duration_hours, 0) # Use np.where(duration_hours > 0, distances / duration_hours, 0)
 
     return pd.DataFrame({
-        "trip_duration_minutes":  ,
-        "avg_speed_mph":
+        "trip_duration_minutes":  duration_minutes,
+        "avg_speed_mph": avg_speed
     })
 
 # Apply the UDF to create trip metrics
 trips_with_metrics = trips_with_time.withColumn(
     "trip_metrics",
     calculate_trip_metrics(
-        col(  ),  # pickup datetime column
-        col(  ),  # dropoff datetime column
-        col(  )   # distance column
+        col( "tpep_pickup_datetime" ),  # pickup datetime column
+        col( "tpep_dropoff_datetime" ),  # dropoff datetime column
+        col( "trip_distance" )   # distance column
     )
 )
 
@@ -320,11 +324,11 @@ print("✅ Task 1.3 complete: Distance-based features created with Pandas UDF")
 
 # Filter out invalid records
 valid_trips = trips_with_metrics.filter(
-    (col("fare_amount") >  ) &  # Positive fares only
-    (col("trip_distance") >  ) &  # What about distance?
-    (col(  ) >  ) &  # trip_duration_minutes should be positive
-    (col(  ) >  ) &  # avg_speed_mph should be positive
-    (col("avg_speed_mph") <  )  # Remove outliers - realistic speed limit?
+    (col("fare_amount") > 0 ) &  # Positive fares only
+    (col("trip_distance") > 0  ) &  # What about distance?
+    (col("trip_duration_minutes") > 0 ) &  # trip_duration_minutes should be positive
+    (col( "avg_speed_mph" ) > 0 ) &  # avg_speed_mph should be positive
+    (col("avg_speed_mph") < 100 )  # Remove outliers - realistic speed limit?
 )
 
 print(f"Valid trips: {valid_trips.count():,} (filtered from {trips_with_metrics.count():,})")
@@ -332,9 +336,9 @@ print(f"Valid trips: {valid_trips.count():,} (filtered from {trips_with_metrics.
 # Save to Delta
 (valid_trips
  .write
- .format(  )  # Delta format
- .mode(  )  # overwrite mode
- .save(  )  # Path: f"{working_dir}/features/taxi_features"
+ .format( "delta" )  # Delta format
+ .mode( "overwrite" )  # overwrite mode
+ .save( f"{working_dir}/features/taxi_features" )  # Path: f"{working_dir}/features/taxi_features"
 )
 
 print(f"✅ Features saved to {working_dir}/features/taxi_features")
@@ -388,7 +392,7 @@ import numpy as np
 mlflow.set_registry_uri("databricks-uc")
 
 # Set MLflow experiment
-mlflow.set_experiment(  )  # Use mlflow_experiment_path variable
+mlflow.set_experiment( mlflow_experiment_path )  # Use mlflow_experiment_path variable
 
 # Load features as pandas DataFrame
 features_pdf = spark.read.format("delta").load(f"{working_dir}/features/taxi_features").toPandas()
@@ -402,38 +406,38 @@ y = features_pdf["fare_amount"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # Start MLflow run
-with mlflow.start_run(run_name=  ) as run:  # Use "baseline_rf_model"
+with mlflow.start_run(run_name= "baseline_rf_model" ) as run:  # Use "baseline_rf_model"
     # Log parameters
-    mlflow.log_param(  ,  )  # Log "feature_set" = "baseline_distance_features"
-    mlflow.log_param(  ,  )  # Log "n_estimators" = 50
-    mlflow.log_param(  ,  )  # Log "max_depth" = 10
+    mlflow.log_param( "feature_set" , "baseline_distance_features" )  # Log "feature_set" = "baseline_distance_features"
+    mlflow.log_param( "n_estimators" , 50 )  # Log "n_estimators" = 50
+    mlflow.log_param( "max_depth" , 10 )  # Log "max_depth" = 10
 
     # Train model
     rf_model = RandomForestRegressor(
-        n_estimators=  ,  # 50 trees
-        max_depth=  ,  # Depth of 10
+        n_estimators= 50 ,  # 50 trees
+        max_depth= 10 , # Depth of 10
         random_state=42
     )
-    rf_model.fit(  ,  )  # Which X and y to use?
+    rf_model.fit( X_train , y_train )  # Which X and y to use?
 
     # Make predictions
     y_pred = rf_model.predict(X_test)
 
     # Calculate metrics
-    rmse =  # np.sqrt(mean_squared_error(y_test, y_pred))
-    mae =  # mean_absolute_error(y_test, y_pred)
-    r2 =  # r2_score(y_test, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred)) # np.sqrt(mean_squared_error(y_test, y_pred))
+    mae =  mean_absolute_error(y_test, y_pred) # mean_absolute_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred) # r2_score(y_test, y_pred)
 
     # Log metrics
-    mlflow.log_metric(  ,  )  # Log RMSE
-    mlflow.log_metric(  ,  )  # Log MAE
-    mlflow.log_metric(  ,  )  # Log R2
+    mlflow.log_metric( "rmse" , rmse)  # Log RMSE
+    mlflow.log_metric( "mae" , mae )  # Log MAE
+    mlflow.log_metric( "r2" , r2 )  # Log R2
 
     # Log model
     mlflow.sklearn.log_model(
-        ,  # The model object
-        ,  # Artifact path: "model"
-        input_example=  # Example input for schema inference (e.g., X_train.head(5))
+       rf_model ,  # The model object
+       "model" ,  # Artifact path: "model"
+        input_example= X_train.head(5) # Example input for schema inference (e.g., X_train.head(5))
     )
 
     baseline_run_id = run.info.run_id
@@ -464,10 +468,10 @@ print("✅ Task 2.1 complete: Baseline model trained and logged to MLflow")
 # Prepare enhanced features (distance + time)
 enhanced_features = [
     "trip_distance",
-    ,  # trip_duration_minutes
-    ,  # pickup_hour
-    ,  # pickup_day_of_week
-      # is_weekend
+    "trip_duration_minutes",  # trip_duration_minutes
+    "pickup_hour",  # pickup_hour
+    "pickup_day_of_week",  # pickup_day_of_week
+    "is_weekend"  # is_weekend
 ]
 X_enhanced = features_pdf[enhanced_features]
 
@@ -475,7 +479,7 @@ X_enhanced = features_pdf[enhanced_features]
 X_train_enh, X_test_enh, y_train_enh, y_test_enh = train_test_split(X_enhanced, y, test_size=0.2, random_state=42)
 
 # Start MLflow run
-with mlflow.start_run(run_name=  ) as run:  # Use "enhanced_rf_model"
+with mlflow.start_run(run_name= enhanced_rf_model ) as run:  # Use "enhanced_rf_model"
     # TODO: Log parameters (feature_set="enhanced_with_time_features", n_estimators=100, max_depth=15)
 
 
