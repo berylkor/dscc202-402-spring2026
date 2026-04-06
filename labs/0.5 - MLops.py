@@ -764,12 +764,12 @@ from pyspark.sql.functions import mean, stddev, percentile_approx, count
 # Use aggregation functions: mean, stddev, percentile_approx, count
 
 prediction_stats = predictions_df.select(
-    mean(  ).alias(  ),  # Mean absolute error
-    stddev(  ).alias(  ),  # Std of absolute error
-    mean(  ).alias(  ),  # Mean percentage error
-    percentile_approx(  , 0.5).alias(  ),  # Median absolute error
-    percentile_approx(  , 0.95).alias(  ),  # 95th percentile
-    count(  ).alias(  )  # Total predictions
+    mean( "absolute_error" ).alias( "mean_absolute_error" ),  # Mean absolute error
+    stddev( "absolute_error" ).alias( "std_absolute_error" ),  # Std of absolute error
+    mean( "percentage_error" ).alias( "mean_percentage_error" ),  # Mean percentage error
+    percentile_approx( "absolute_error" , 0.5).alias( "median_absolute_error" ),  # Median absolute error
+    percentile_approx( "absolute_error" , 0.95).alias( "p95_absolute_error" ),  # 95th percentile
+    count( "predicted_fare" ).alias( "total_predictions" )  # Total predictions
 ).collect()[0]
 
 print("Prediction Performance Summary:")
@@ -793,24 +793,24 @@ print(f"  Mean Percentage Error: {prediction_stats['mean_percentage_error']:.2f}
 
 # Select relevant columns for storage
 predictions_to_save = predictions_df.select(
-    ,  # tpep_pickup_datetime
-    ,  # tpep_dropoff_datetime
-    ,  # trip_distance
-    ,  # pickup_zip
-    ,  # dropoff_zip
-    ,  # fare_amount
-    ,  # predicted_fare
-    ,  # prediction_error
-    ,  # absolute_error
-      # percentage_error
+  "tpep_pickup_datetime"  ,  # tpep_pickup_datetime
+  "tpep_dropoff_datetime"  ,  # tpep_dropoff_datetime
+  "trip_distance"  ,  # trip_distance
+  "pickup_zip"  ,  # pickup_zip
+  "dropoff_zip"  ,  # dropoff_zip
+  "fare_amount"  ,  # fare_amount
+  "predicted_fare"  ,  # predicted_fare
+  "prediction_error"  ,  # prediction_error
+  "absolute_error"  ,  # absolute_error
+  "percentage_error"    # percentage_error
 )
 
 # Save to Delta
 (predictions_to_save
  .write
- .format(  )  # Delta format
- .mode(  )  # overwrite mode
- .save(  )  # Path: f"{working_dir}/predictions/fare_predictions"
+ .format( "delta" )  # Delta format
+ .mode( "overwrite" )  # overwrite mode
+ .save( f"{working_dir}/predictions/fare_predictions" )  # Path: f"{working_dir}/predictions/fare_predictions"
 )
 
 print(f"✅ Predictions saved to {working_dir}/predictions/fare_predictions")
@@ -867,6 +867,10 @@ print("✅ Task 3.4 complete: Predictions saved to Delta")
 # COMMAND ----------
 
 # Optional: Clean up lab data (uncomment to execute)
-# dbutils.fs.rm(f"{working_dir}/features", recurse=True)
-# dbutils.fs.rm(f"{working_dir}/predictions", recurse=True)
-# print("✅ Lab cleanup complete")
+dbutils.fs.rm(f"{working_dir}/features", recurse=True)
+dbutils.fs.rm(f"{working_dir}/predictions", recurse=True)
+print("✅ Lab cleanup complete")
+
+# COMMAND ----------
+
+
