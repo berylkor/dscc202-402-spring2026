@@ -479,38 +479,41 @@ X_enhanced = features_pdf[enhanced_features]
 X_train_enh, X_test_enh, y_train_enh, y_test_enh = train_test_split(X_enhanced, y, test_size=0.2, random_state=42)
 
 # Start MLflow run
-with mlflow.start_run(run_name= enhanced_rf_model ) as run:  # Use "enhanced_rf_model"
+with mlflow.start_run(run_name= "enhanced_rf_model" ) as run:  # Use "enhanced_rf_model"
     # TODO: Log parameters (feature_set="enhanced_with_time_features", n_estimators=100, max_depth=15)
-
-
+    mlflow.log_param("feature_set", "enhanced_with_time_features")
+    mlflow.log_param("n_estimators", 100)
+    mlflow.log_param("max_depth", 15)
 
 
     # TODO: Train RandomForestRegressor with n_estimators=100, max_depth=15, random_state=42
     rf_model_enh = RandomForestRegressor(
-        ,  # n_estimators
-        ,  # max_depth
+        n_estimators=100,  # n_estimators
+        max_depth=15,  # max_depth
         random_state=42
     )
-
+    rf_model_enh.fit(X_train_enh, y_train_enh)
 
     # TODO: Make predictions
-    y_pred_enh =
+    y_pred_enh = rf_model_enh.predict(X_test_enh)
 
     # TODO: Calculate metrics (rmse_enh, mae_enh, r2_enh)
-
-
+    rmse_enh = np.sqrt(mean_squared_error(y_test_enh, y_pred_enh)) 
+    mae_enh =  mean_absolute_error(y_test_enh, y_pred_enh) 
+    r2_enh = r2_score(y_test_enh, y_pred_enh) 
 
 
     # TODO: Log all metrics to MLflow
-
-
+    mlflow.log_metric( "rmse" , rmse_enh)  # Log RMSE
+    mlflow.log_metric( "mae" , mae_enh)  # Log MAE
+    mlflow.log_metric( "r2" , r2_enh)  # Log R2
 
 
     # TODO: Log the trained model with input_example
     mlflow.sklearn.log_model(
-
-
-
+        rf_model_enh ,  # The model object
+        "model" ,  # Artifact path: "model"
+        input_example= X_train_enh.head(5)
     )
 
     enhanced_run_id = run.info.run_id
@@ -541,12 +544,12 @@ print("✅ Task 2.2 complete: Enhanced model trained and logged to MLflow")
 # Search and compare all runs in the experiment
 
 # Get experiment ID
-experiment = mlflow.get_experiment_by_name(  )  # Which experiment path?
+experiment = mlflow.get_experiment_by_name( mlflow_experiment_path )  # Which experiment path?
 
 # Search runs, ordered by RMSE (ascending = better)
 all_runs = mlflow.search_runs(
-    experiment_ids=  ,  # Use [experiment.experiment_id] as a list
-    order_by=  # Order by metrics.rmse ASC (as a list)
+    experiment_ids= [experiment.experiment_id] ,  # Use [experiment.experiment_id] as a list
+    order_by= ["metrics.rmse ASC"] # Order by metrics.rmse ASC (as a list)
 )
 
 # Display comparison
@@ -554,7 +557,7 @@ print("All Runs Comparison (sorted by RMSE):")
 display(all_runs[["run_id", "params.feature_set", "metrics.rmse", "metrics.mae", "metrics.r2", "start_time"]])
 
 # Get best run
-best_run =  # First row from all_runs DataFrame (hint: .iloc[0])
+best_run = all_runs.iloc[0] # First row from all_runs DataFrame (hint: .iloc[0])
 print(f"\n🏆 Best Model:")
 print(f"  Feature Set: {best_run['params.feature_set']}")
 print(f"  RMSE: {best_run['metrics.rmse']:.2f}")
@@ -589,13 +592,13 @@ print("✅ Task 2.3 complete: Experiments compared using MLflow")
 model_name = f"nyctaxi_fare_predictor_{spark.sql('SELECT current_user()').collect()[0][0].split('@')[0]}"
 
 # Get best model URI
-best_model_uri = f"runs:/{  }/model"  # Use best_run['run_id']
+best_model_uri = f"runs:/{ best_run['run_id'] }/model"  # Use best_run['run_id']
 
 try:
     # Register model
     model_version = mlflow.register_model(
-        model_uri=  ,  # The model URI
-        name=  # The model name
+        model_uri= best_model_uri ,  # The model URI
+        name= model_name # The model name
     )
 
     print(f"✅ Model registered: {model_name} (version {model_version.version})")
@@ -654,8 +657,8 @@ from pyspark.sql.functions import pandas_udf, PandasUDFType
 import pandas as pd
 
 # Get the best model URI and load the model
-best_model_uri = f"runs:/{  }/model"  # Use best_run['run_id'] from Task 2.3
-loaded_model = mlflow.pyfunc.load_model(  )  # Load the model URI
+best_model_uri = f"runs:/{ best_run['run_id'] }/model"  # Use best_run['run_id'] from Task 2.3
+loaded_model = mlflow.pyfunc.load_model( best_model_uri )  # Load the model URI
 
 print(f"✅ Loaded model from: {best_model_uri}")
 
@@ -671,17 +674,17 @@ def predict_fare_udf(trip_distance: pd.Series, trip_duration_minutes: pd.Series,
     # TODO: Construct feature DataFrame matching model's expected input
     # Create DataFrame with columns matching enhanced_features from Task 2.2
     features_df = pd.DataFrame({
-        :  ,  # trip_distance
-        :  ,  # trip_duration_minutes
-        :  ,  # pickup_hour
-        :  ,  # pickup_day_of_week
-        :    # is_weekend
+        "trip_distance": trip_distance ,  # trip_distance
+        "trip_duration_minutes": trip_duration_minutes  ,  # trip_duration_minutes
+        "pickup_hour": pickup_hour  ,  # pickup_hour
+        "pickup_day_of_week": pickup_day_of_week  ,  # pickup_day_of_week
+        "is_weekend": is_weekend    # is_weekend
     })
 
     # TODO: Make predictions using the loaded model
-    predictions =  # Use loaded_model.predict(...)
+    predictions = loaded_model.predict(features_df) # Use loaded_model.predict(...)
 
-    return pd.Series(  )  # Return predictions as Series
+    return pd.Series( predictions )  # Return predictions as Series
 
 print("✅ Created Pandas UDF for distributed inference")
 
@@ -713,26 +716,26 @@ features_spark_df = spark.read.format("delta").load(f"{working_dir}/features/tax
 predictions_df = features_spark_df.withColumn(
     "predicted_fare",
     predict_fare_udf(
-        col(  ),  # trip_distance
-        col(  ),  # trip_duration_minutes
-        col(  ),  # pickup_hour
-        col(  ),  # pickup_day_of_week
-        col(  )   # is_weekend
+        col( "trip_distance" ),  # trip_distance
+        col( "trip_duration_minutes" ),  # trip_duration_minutes
+        col( "pickup_hour" ),  # pickup_hour
+        col( "pickup_day_of_week" ),  # pickup_day_of_week
+        col( "is_weekend" )   # is_weekend
     )
 )
 
 # Calculate prediction error
 predictions_df = predictions_df.withColumn(
     "prediction_error",
-    col(  ) - col(  )  # predicted - actual
+    col( "predicted_fare" ) - col( "fare_amount" )  # predicted - actual
 ).withColumn(
     "absolute_error",
-    abs(col(  ))  # Absolute value of prediction_error
+    abs(col( "prediction_error" ))  # Absolute value of prediction_error
 ).withColumn(
     "percentage_error",
-    (col(  ) / col(  )) * 100  # (absolute_error / fare_amount) * 100
+    (col( "absolute_error" ) / col( "fare_amount" )) * 100  # (absolute_error / fare_amount) * 100
 )
-
+""
 print(f"✅ Generated predictions for {predictions_df.count():,} trips")
 display(predictions_df.select("fare_amount", "predicted_fare", "absolute_error", "percentage_error").limit(10))
 
