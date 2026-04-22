@@ -28,7 +28,9 @@
 # - pyspark.pipelines (as dp)
 # - pyspark.sql.types (for schema definition)
 # - pyspark.sql.functions (for column operations)
-
+from pyspark import pipelines as dp
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -47,6 +49,10 @@ spark.conf.set("spark.sql.legacy.timeParserPolicy", "LEGACY")
 # COMMAND ----------
 
 # TODO: Create streaming table definition
+dp.create_streaming_table(
+    name='tweets_bronze',
+    comment='Raw Tweet Records - columns stores as strings.',
+)
 
 
 # COMMAND ----------
@@ -65,7 +71,14 @@ spark.conf.set("spark.sql.legacy.timeParserPolicy", "LEGACY")
 # COMMAND ----------
 
 # TODO: Define tweet schema as StructType
-
+schema = StructType(
+    [
+        StructField('date', StringType()),
+        StructField('user', StringType()),
+        StructField('text', StringType()),
+        StructField('sentiment', StringType())
+    ]
+)
 
 # COMMAND ----------
 
@@ -87,7 +100,22 @@ spark.conf.set("spark.sql.legacy.timeParserPolicy", "LEGACY")
 # COMMAND ----------
 
 # TODO: Define append_flow function for bronze ingestion
-
+@dp.append_flow(
+    target='tweets_bronze',
+    comment='Tweets ingest from S3 buckets'
+)
+def append_flow(df, batch_id):
+    return (
+        spark.readStream
+            .format('cloudFiles')
+            .option('cloudFiles.format', 'json')
+            .option('inferSchema', 'false')
+            .option('cloudFiles.schemaLocation', f'/Volumes/workspace/default/checkpoints/')
+            .schema(schema)
+            .load('s3://dsas-datasets/tweets/')
+            .withColumn("source_file",  F.col("_metadata.file_path"))
+            .withColumn("processing_time",  F.current_timestamp())
+    )
 
 # COMMAND ----------
 

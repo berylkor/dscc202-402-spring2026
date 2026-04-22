@@ -870,7 +870,3 @@ print("✅ Task 3.4 complete: Predictions saved to Delta")
 dbutils.fs.rm(f"{working_dir}/features", recurse=True)
 dbutils.fs.rm(f"{working_dir}/predictions", recurse=True)
 print("✅ Lab cleanup complete")
-
-# COMMAND ----------
-
-
