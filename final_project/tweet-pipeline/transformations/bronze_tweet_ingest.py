@@ -104,17 +104,17 @@ schema = StructType(
     target='tweets_bronze',
     comment='Tweets ingest from S3 buckets'
 )
-def append_flow(df, batch_id):
+def append_bronze_tweets():
     return (
         spark.readStream
-            .format('cloudFiles')
-            .option('cloudFiles.format', 'json')
-            .option('inferSchema', 'false')
-            .option('cloudFiles.schemaLocation', f'/Volumes/workspace/default/checkpoints/')
-            .schema(schema)
-            .load('s3://dsas-datasets/tweets/')
-            .withColumn("source_file",  F.col("_metadata.file_path"))
-            .withColumn("processing_time",  F.current_timestamp())
+             .format('cloudFiles')
+             .option('cloudFiles.format', 'json')
+             .option('inferSchema', 'false')
+             .option('cloudFiles.schemaLocation', f'/Volumes/workspace/default/checkpoints/')
+             .schema(schema)
+             .load('s3://dsas-datasets/test-tweets/')
+             .withColumn("source_file",  F.col("_metadata.file_path"))
+             .withColumn("processing_time",  F.current_timestamp())
     )
 
 # COMMAND ----------
