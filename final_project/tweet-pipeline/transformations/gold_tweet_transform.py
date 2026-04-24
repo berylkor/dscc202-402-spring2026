@@ -35,7 +35,10 @@
 # - pyspark.pipelines (as dp)
 # - pyspark.sql.types and pyspark.sql.functions
 # - mlflow for model loading
-
+from pyspark import pipelines as dp
+from pyspark.sql import functions as F
+from pyspark.sql.types import *
+import mlflow
 
 # COMMAND ----------
 
@@ -47,6 +50,10 @@
 # COMMAND ----------
 
 # TODO: Create streaming table definition
+dp.create_streaming_table(
+    name='tweets_gold',
+    comment='Predicted sentiment of tweets',
+)
 
 
 # COMMAND ----------
@@ -60,7 +67,7 @@
 # COMMAND ----------
 
 # TODO: Configure MLflow registry
-
+mlflow.set_registry_uri("databricks-uc")
 
 # COMMAND ----------
 
