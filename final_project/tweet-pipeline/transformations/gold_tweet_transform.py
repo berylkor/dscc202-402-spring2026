@@ -1,4 +1,9 @@
 # Databricks notebook source
+# MAGIC %pip install transformers==4.35.2 torch torchvision --quiet
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC # Gold Layer: ML Inference for Sentiment Prediction
 # MAGIC
@@ -39,6 +44,7 @@ from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
 import mlflow
+import transformers
 
 # COMMAND ----------
 
@@ -80,8 +86,12 @@ mlflow.set_registry_uri("databricks-uc")
 
 # COMMAND ----------
 
+# DBTITLE 1,Cell 9
 # TODO: Define model output schema
-
+schema = StructType([
+    StructField('label', StringType()),
+    StructField('score', DoubleType())
+])
 
 # COMMAND ----------
 
@@ -97,7 +107,8 @@ mlflow.set_registry_uri("databricks-uc")
 # COMMAND ----------
 
 # TODO: Load model and create Spark UDF
-
+model_uri = "models:/workspace.default.small_sentiment_model/1"
+model_udf = mlflow.pyfunc.spark_udf(spark, model_uri, schema)
 
 # COMMAND ----------
 
@@ -121,8 +132,30 @@ mlflow.set_registry_uri("databricks-uc")
 
 # COMMAND ----------
 
+# DBTITLE 1,Cell 13
 # TODO: Define append_flow function for gold transformation
-
+@dp.append_flow(
+    target='tweets_gold',
+    comment='Predicted sentiment of tweets',
+)
+def append_gold_tweets():
+    cleaned_tweets = spark.readStream.table('tweets_silver')
+    tweets_sentiment = (
+         cleaned_tweets
+         .withColumn('prediction',  model_udf(F.col('cleaned_text')))
+         .withColumn('label', F.col('prediction.label'))
+         .withColumn('score', (F.col('prediction.score') * 100).cast(DoubleType()))
+         
+    )
+    return tweets_sentiment.select(
+        'timestamp',
+        'mention',
+        'cleaned_text',
+        'text',
+        'sentiment',
+        'label',
+        'score'
+    )
 
 # COMMAND ----------
 
