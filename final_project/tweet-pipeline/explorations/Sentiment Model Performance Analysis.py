@@ -30,7 +30,14 @@
 # - delta.tables.DeltaTable
 # - matplotlib.pyplot
 # - sklearn.metrics (confusion_matrix, classification_report, ConfusionMatrixDisplay)
-
+import pyspark.sql.functions as F
+from pyspark.sql.types import *
+import pandas as pd
+import mlflow
+from mlflow import MlflowClient
+from delta.tables import DeltaTable
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
 
 # COMMAND ----------
 
@@ -45,7 +52,9 @@
 # COMMAND ----------
 
 # TODO: Load gold table
-
+gold_table = spark.read.format('delta').table('workspace.default.tweets_gold')
+sentiment = gold_table.select('sentiment_id', 'predicted_sentiment_id')
+sentiment.show()
 
 # COMMAND ----------
 
@@ -64,7 +73,12 @@
 # COMMAND ----------
 
 # TODO: Generate classification report
-
+pd_sentiment = sentiment.toPandas()
+y_true = pd_sentiment['sentiment_id']
+y_pred = pd_sentiment['predicted_sentiment_id']
+target_names = ['Negative','Positive']
+classification = classification_report(y_true, y_pred, target_names=target_names, output_dict=True)
+print(classification)
 
 # COMMAND ----------
 
@@ -85,7 +99,11 @@
 # COMMAND ----------
 
 # TODO: Create and display confusion matrix
-
+cm = confusion_matrix(y_true, y_pred)
+cm_display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=target_names)
+cm_display.plot()
+plt.title("Confusion Matrix")
+plt.show()
 
 # COMMAND ----------
 
@@ -110,6 +128,22 @@
 # COMMAND ----------
 
 # TODO: Log metrics and artifacts to MLflow
+plt.savefig("confusion_matrix.png")
+
+mlflow.set_registry_uri("databricks-uc")
+silver_table = DeltaTable.forName(spark, "workspace.default.tweets_silver")
+history = silver_table.history()
+silver_version = history.select("version", ascending=False).first()["version"]
+with mlflow.start_run() as run:
+    # Log metrics
+    mlflow.log_metric("accuracy", classification["accuracy"])
+    mlflow.log_param("model_name",  "workspace.default.tweet_sentiment_model")
+    mlflow.log_param("model_version", 1)
+    mlflow.log_param("silver_delta_version", silver_version)
+  
+    # Log artifacts
+    mlflow.log_artifact("confusion_matrix.png")
+
 
 
 # COMMAND ----------

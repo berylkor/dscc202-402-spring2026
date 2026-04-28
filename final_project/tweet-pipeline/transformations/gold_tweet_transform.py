@@ -139,13 +139,14 @@ model_udf = mlflow.pyfunc.spark_udf(spark, model_uri, schema)
     comment='Predicted sentiment of tweets',
 )
 def append_gold_tweets():
-    cleaned_tweets = spark.readStream.table('tweets_silver')
+    cleaned_tweets = dp.read_stream('tweets_silver')
     tweets_sentiment = (
          cleaned_tweets
          .withColumn('prediction',  model_udf(F.col('cleaned_text')))
-         .withColumn('label', F.col('prediction.label'))
-         .withColumn('score', (F.col('prediction.score') * 100).cast(DoubleType()))
-         
+         .withColumn('predicted_sentiment', F.lower(F.col('prediction.label')))
+         .withColumn('predicted_score', (F.col('prediction.score') * 100).cast(DoubleType()))
+         .withColumn('sentiment_id', F.when(F.col('sentiment')==0, 0).when(F.col('sentiment')==4, 1))
+         .withColumn('predicted_sentiment_id', F.when(F.col('predicted_sentiment')=='negative', 0).when(F.col('predicted_sentiment')=='positive', 1))
     )
     return tweets_sentiment.select(
         'timestamp',
@@ -153,8 +154,10 @@ def append_gold_tweets():
         'cleaned_text',
         'text',
         'sentiment',
-        'label',
-        'score'
+        'predicted_sentiment',
+        'predicted_score',
+        'sentiment_id',
+        'predicted_sentiment_id'
     )
 
 # COMMAND ----------
