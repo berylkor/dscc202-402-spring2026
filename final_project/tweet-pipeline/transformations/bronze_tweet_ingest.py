@@ -112,7 +112,7 @@ def append_bronze_tweets():
              .option('inferSchema', 'false')
              .option('cloudFiles.schemaLocation', f'/Volumes/workspace/default/checkpoints/')
              .schema(schema)
-             .load('s3://dsas-datasets/test-tweets/')
+             .load('s3://dsas-datasets/tweets/')
              .withColumn("source_file",  F.col("_metadata.file_path"))
              .withColumn("processing_time",  F.current_timestamp())
     )

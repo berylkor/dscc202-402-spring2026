@@ -54,7 +54,7 @@ from sklearn.metrics import confusion_matrix, classification_report, ConfusionMa
 # TODO: Load gold table
 gold_table = spark.read.format('delta').table('workspace.default.tweets_gold')
 sentiment = gold_table.select('sentiment_id', 'predicted_sentiment_id')
-sentiment.show()
+sentiment.show(5)
 
 # COMMAND ----------
 
@@ -78,7 +78,7 @@ y_true = pd_sentiment['sentiment_id']
 y_pred = pd_sentiment['predicted_sentiment_id']
 target_names = ['Negative','Positive']
 classification = classification_report(y_true, y_pred, target_names=target_names, output_dict=True)
-print(classification)
+classification
 
 # COMMAND ----------
 
@@ -103,6 +103,7 @@ cm = confusion_matrix(y_true, y_pred)
 cm_display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=target_names)
 cm_display.plot()
 plt.title("Confusion Matrix")
+plt.savefig("confusion_matrix.png")
 plt.show()
 
 # COMMAND ----------
@@ -127,24 +128,21 @@ plt.show()
 
 # COMMAND ----------
 
+# DBTITLE 1,Cell 10
 # TODO: Log metrics and artifacts to MLflow
-plt.savefig("confusion_matrix.png")
-
 mlflow.set_registry_uri("databricks-uc")
-silver_table = DeltaTable.forName(spark, "workspace.default.tweets_silver")
-history = silver_table.history()
-silver_version = history.select("version", ascending=False).first()["version"]
+silver_table = spark.sql("DESCRIBE HISTORY workspace.default.tweets_silver")
+silver_version = silver_table.select("version").first()[0]
+
 with mlflow.start_run() as run:
     # Log metrics
     mlflow.log_metric("accuracy", classification["accuracy"])
-    mlflow.log_param("model_name",  "workspace.default.tweet_sentiment_model")
+    mlflow.log_param("model_name",  "workspace.default.small_sentiment_model")
     mlflow.log_param("model_version", 1)
     mlflow.log_param("silver_delta_version", silver_version)
   
     # Log artifacts
     mlflow.log_artifact("confusion_matrix.png")
-
-
 
 # COMMAND ----------
 
